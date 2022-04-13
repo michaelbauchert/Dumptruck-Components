@@ -100,14 +100,14 @@
 		knob.focus();
 		knob.onpointermove = handleDrag;
 		knob.setPointerCapture(e.pointerId);
-		knob.requestPointerLock();
+		//knob.requestPointerLock();
 	}//end begin knob turn
 
 	function endKnobTurn(e) {
 		knobDelta = 0;
 		knob.onpointermove = null;
   		knob.releasePointerCapture(e.pointerId);
-		document.exitPointerLock();
+		//document.exitPointerLock();
 	}//end knob turn
 
 
