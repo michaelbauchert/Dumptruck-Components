@@ -1,173 +1,171 @@
 <svelte:options tag="dt-knob" />
 
-<script>
-	export let name = '';
-	$: isPanKnob = (name.toLowerCase() === "panning" || name.toLowerCase() === "pan");
+<!--
+TODO:
+-Reversable min and max
+-mulitple unitsp
+-threshold to set value to -Infinity
+-docs
+-publish to npm
+-->
 
-	export let unit = "%";
-	$: if (isPanKnob) {
-		if(value === mid) {
-			unit = "C";
-		} else if(value < mid) {
-			unit = "L";
-		} else if(value > mid) {
-			unit = "R";
-		}
-	}
 
+<script>		
+	import ValueScaling from "./ValueScaling.svelte";
+
+	import { get_current_component } from "svelte/internal";    
+    const component = get_current_component();
+
+	const dispatchEvent = (name) => {
+        component?.dispatchEvent(new CustomEvent(name, {
+        detail: {
+			label,
+			value,
+			normal,
+			scale,
+			modifier,
+			min,
+			max,
+			step,
+			unit,
+		},
+        composed: true  // propagate across the shadow DOM
+        }));
+    };
+
+	/**
+	 * The selected value.
+	 * @type {number}
+	 */
+	export let value = 0;
+	
+	/**
+	 * 
+	 * @type {number | null}
+	 */
+	export let defaultvalue = null;	
+
+	let display;
+
+	/**
+	 * The value between 0 and 1, representing `value`'s position relative to `min` and `max` according to the defined `mode`.
+	 * @type {number}
+	 */
+	let normal;
+
+	Object.defineProperty(component, 'normal', {
+		get: () => { return normal },
+		set: (newNormal) => { knobState.setValueFromNormal(newNormal) }
+	});
+
+	/**
+	 * Optional identifier
+	 * @type {string}
+	 */
+	export let label;
+
+	/**
+	 * @type {"lin" | "pow" | "log" | "db"}
+	 */
+	export let scale = "lin";
+
+	/**
+	 * @type {number}
+	 */
+	export let modifier = 1;
+
+	/**
+	 * The granularity that the value must adhere to.
+	 * @type {number}
+	 */
 	export let step = 1;
-	$: decimalPlaces = (step.toString().split(".")[1] ?? []).length;
-	$: tens = Math.pow(10, decimalPlaces);
 
+	/**
+	 * The lowest value in the range of permitted values.
+	 * @type {number}
+	 */
 	export let min = 0;
+
+	/**
+	 * The greatest value in the range of permitted values.
+	 * @type {number}
+	 */
 	export let max = 100;
-	$: if(typeof min === "string" || typeof max === "string") {
-		min = parseFloat(min);
-		max = parseFloat(max);
-		if(value < min) {
-			value = min;
-		} else if(value > max) {
-			value = max;
-		}
-		setMid();
-	}
 
-	export let mid = 50;
-	export let exponent = 1;
-	$: if(typeof mid === "string" && typeof exponent !== "string") {
-		mid = parseFloat(mid);				
-		if (mid >= max || mid <= min)
-			console.warn(`Knob ${name}'s 'mid' attribute should not meet or exceed bounds set by min and max.`);		
-	} else if(typeof exponent === "string") {
-		exponent = parseFloat(exponent);
-	}	
-	$: setMid(exponent);
-	$: setExponent(mid);
-	function setMid(newExponent = 1) {
-		mid = normalToValue(0.5);
-		normalvalue = valueToNormal(value);
-	}
-	function setExponent(newMid) {
-		exponent = Math.log10((newMid - min) / (max - min))/Math.log10(0.5);
-		normalvalue = valueToNormal(value);
-	}
+	/**
+	 * The determiner of quantity appended to the displayed value.
+	 * @type {string}
+	 */
+	export let unit = '%';
+	
+	/**
+	 * @type {number}
+	 */
+	export let sensitivity = 1;
+	$: dragDenominator = screen.height / Number(sensitivity);
 
-	export let defaultvalue;
-	$: if(typeof defaultvalue === "string") {
-		defaultvalue = parseFloat(defaultvalue);
-		if (defaultvalue > max || defaultvalue < min)
-			console.warn(`Knob ${name}'s 'defaultvalue' attribute should not exceed bounds set by min and max.`);
-	}
-
-	export let value = mid;
-	export let normalvalue = valueToNormal(value);
-	$: if(typeof value === "string" && typeof normalvalue !== "string") {
-		value = parseFloat(mid);		
-		if (value > max || value <= min)
-			console.warn(`Knob ${name}'s 'value' attribute should not exceed bounds set by min and max.`);
-	} else if(typeof normalvalue === "string") {
-		normalvalue = parseFloat(exponent);
-	}
-	$: setValue(normalvalue);
-	$: setNormal(value);
-	function setValue(newNormal) {
-		value = parseFloat(normalToValue(newNormal).toFixed(decimalPlaces));
-	}
-	function setNormal(newValue) {
-		normalvalue = valueToNormal(newValue);		
-	}	
-
-	//variables to reference knob and numberInput elements
-	let knob;
-
-	function valueToNormal(value) {
-		return Math.pow((value - min) / (max - min), 1/exponent);
-	}//end convert value to normal range
-
-	function normalToValue(normal) {
-		let newValue = Math.pow(normal, exponent) * (max - min) + min;
-		if(exponent !== 1) {
-			newValue = newValue * tens;
-			newValue = Math.trunc(newValue) + Math.pow(newValue - Math.trunc(newValue), 1/exponent);
-			newValue = newValue / tens;
-		}		
-		return Math.round(newValue / step) * step;
-	}//end convert normal range to value	
-
+	let knobState, knob, input;
 	let knobDelta = 0;
-
+	let valueOld;
+	
 	function beginKnobTurn(e) {
+		if(e.button !== 0) return;//check if left mouse or touch
+		valueOld = value;		
 		knob.focus();
-		knob.onpointermove = handleDrag;
 		knob.setPointerCapture(e.pointerId);
-		knob.requestPointerLock();
-	}//end begin knob turn
+		knob.addEventListener('pointermove', handleDrag);		
+		knob.requestPointerLock();		
+	}
 
 	function endKnobTurn(e) {
-		knobDelta = 0;
-		knob.onpointermove = null;
-  		knob.releasePointerCapture(e.pointerId);
-		document.exitPointerLock();
-	}//end knob turn
-
-
-	export let sensitivity = 1;
-	$: dragDenominator = screen.height / parseFloat(sensitivity);
-	function handleDrag(e) {
-		if(e.shiftKey) {
-			knobDelta -= (e.movementY - e.movementX)/dragDenominator;
-		} else {
-			knobDelta -= (e.movementY - e.movementX)/(dragDenominator / 3);
-		}//end check shift key
-
-		const newNormal = normalvalue + knobDelta;
-		const newValue = normalToValue(newNormal);
-		if (newValue !== value) {
-			if(newNormal >= 1) {
-				value = max;
-			} else if (newNormal <= 0) {
-				value = min;
-			} else {
-				value = parseFloat(newValue.toFixed(decimalPlaces));
-			}//end setting normalValue
+		knobDelta = 0;  		
+		document.exitPointerLock();	
+		knob.removeEventListener('pointermove', handleDrag);
+		knob.releasePointerCapture(e.pointerId);
+		if(value !== valueOld)
+			dispatchEvent('change');
+	}		
+	
+	async function handleDrag(e) {
+		if(Math.abs(e.movementY) > 250) return;//fixes weird jumping bug		
+		knobDelta -= e.movementY / (dragDenominator / (e.shiftKey ? 3 : 1));
+		
+		const response = knobState.setValueFromNormal(knobDelta + normal);
+		
+		if(response.minMax || response.valueChanged)
 			knobDelta = 0;
-		}
-	}//end handleDrag
 
-	function setToDefault() {
-		value = defaultvalue ?? value;
-	}//end set to default
+		if(response.valueChanged) 
+			dispatchEvent('input');			
+	}
 
 	function handleKeyDown(e) {
-		if (e.key === "Delete") {
-			setToDefault();
-		} else if (value < max && e.key === "ArrowUp" || e.key === "ArrowRight") {
-			value += step;
-		} else if (value > min && e.key === "ArrowDown" || e.key === "ArrowLeft") {
-			value -= step;
-		} else if (isFinite(e.key) || e.key === '-') {
-			input.focus();
-		}
-	}//end handle key down
-
-	import { createEventDispatcher } from 'svelte';
-	const dispatch = createEventDispatcher();
-	$:dispatchInputEvent(normalvalue);
-	function dispatchInputEvent(normalvalue) {
-		dispatch('input', {
-				name: name,
-				value: value,
-				normalvalue: normalvalue,
-				min: min,
-				max: max,
-				mid: mid,
-				unit: unit,
-				exponent: exponent,
-			});
-	}//end dispatch input event
-	
-
-	let input;
+		switch(e.key) {
+			case 'Delete':
+				knobState.setValueToDefault();
+				break;
+			case 'ArrowUp':
+				e.preventDefault();
+				knobState.increment(e.repeat);
+				break;
+			case 'ArrowDown':
+				e.preventDefault();
+				knobState.decrement(e.repeat);
+				break;
+			case 'Home':
+				knobState.setValueFromNormal(0);
+				break;
+			case 'End':
+				knobState.setValueFromNormal(1);
+				break;
+			default:
+				if (isFinite(e.key) || 
+					e.key === '-' || 
+					e.key === 'ArrowLeft' || 
+					e.key == 'ArrowRight')
+					input.focus();
+		} 
+	}		
 
 	function inputFocus(e) {
 		input.type = "number";
@@ -177,20 +175,47 @@
 
 	function inputBlur(e) {
 		input.type = "text";
-		input.value = value + ' ' + unit;
+		input.value = display;
 	}
 
-	function inputEnter(e) {
-		if(e.key === "Enter") {
-			value = Math.round(Math.max(Math.min(max, e.target.value), min) / step) * step;
-			knob.focus();
-		}
-	}
+	function inputSubmit(e) {
+		switch(e.key) {
+			case 'Escape':
+				knob.focus();
+				break;
+			case 'Enter':							
+				if(input.value != value) {
+					knobState.setValue(input.value);					
+					dispatchEvent('change');
+				}
+				knob.focus();
+				break;
+		}		
+	}    	
 </script>
 
-<label for="knob">{name}</label>
-<div id="knob"
-	style="--knob-normal: {normalvalue}"
+<ValueScaling
+	bind:this={knobState}
+	bind:value
+	bind:display
+	bind:normal
+	defaultvalue={Number(defaultvalue)}
+	scale={scale}	
+	modifier={Number(modifier)}	
+	min={Math.min(Number(min), Number(max))}
+	max={Math.max(Number(min), Number(max))}
+	flipped={Number(min) > Number(max)}
+	step={Number(step)}
+	unit={unit} />
+
+
+
+<label part="label" for="knob">{label ?? ""}</label>
+
+
+<div part="knob" 
+	id="knob"
+	style="--knob-normal: {normal}"
 	bind:this={knob}
     tabindex="0"
     draggable="false"
@@ -198,97 +223,74 @@
 	aria-valuemin={min}
 	aria-valuemax={max}
 	aria-valuenow={value}
-	aria-valuetext={value + ' ' + unit}
+	aria-valuetext={display}
+	aria-orientation="vertical"
 	on:pointerdown|preventDefault={beginKnobTurn}
-	on:pointerup={endKnobTurn}
-	on:dblclick={setToDefault}
+	on:pointerup={endKnobTurn}	
 	on:keydown={handleKeyDown}>
     <slot>
-        <svg viewBox="0 0 100 100">
-            <g>
-                <circle cx="50" cy="50" r="50"/>
-                <rect/>
+        <svg part="svg"
+			 viewBox="0 0 100 100" >
+            <g style:transform-origin="center center"
+			   style:transform="rotateZ(var(--knob-rotation)" >
+                <circle cx="50" cy="50" r="50" fill="lightgrey"/>
+                <rect width="7" height="35" fill="#333" x="47.5"/>
             </g>
         </svg>
     </slot>
 </div>
-<input bind:this={input}
-	   style="--char-max: {Math.max(Math.trunc(min).toString().length, Math.trunc(max).toString().length) + decimalPlaces + unit.length + 2}ch"	   
+
+<input part="input" 
+	   bind:this={input}	   
 	   type="text"
 	   tabindex="-1"
 	   min={min}
 	   max={max}
-	   value={(isPanKnob ? Math.abs(value).toFixed(decimalPlaces) : value.toFixed(decimalPlaces)) + ' ' + unit}
+	   step={step}
+	   value={display}
 	   on:focus={inputFocus}
 	   on:blur={inputBlur}
-	   on:keyup={inputEnter}>
+	   on:change|stopPropagation 
+	   on:input|stopPropagation 
+	   on:keyup={inputSubmit}>
 
 <style>
 	:host {
-        --knob-grid-gap: 3px;
-
-        --knob-fill: lightgrey;
-
-        --indicator-width: 7%;
-        --indicator-height: 35%;
-        --indicator-fill: black;
-        --indicator-border-radius: 50%;
-        --indicator-margin-top: -1px;
-
-        --knob-label-font-size: 13.3333px;
-        --knob-input-font-size: 13.3333px;
-		--knob-text-align: center;
-		--knob-text-justify: center;
-
-		vertical-align: top;
         display: inline-grid;
 		padding: 1px 6px;
-        grid-gap: var(--knob-grid-gap);
+		width: 4em;       
         grid-template-rows: min-content auto min-content;
 		grid-template-columns: minmax(0, 1fr);
         grid-template-areas:
         'label'
         'knob'
         'input';
-
-		--border-thickness:2px;   /* thickness of the border */
-		--border-color:black;   /* color of the border */
-		--border-width:9px; /* width of border */
-		
-
-		border:var(--border-thickness) solid transparent; /* space for the border */
-		box-sizing: border-box;		
+		gap: 3px;
+		overflow: hidden;
     }
 
 	:host(:focus-within) {
-		background:
-			linear-gradient(var(--border-color),var(--border-color)) top left,
-			linear-gradient(var(--border-color),var(--border-color)) top left,
-			linear-gradient(var(--border-color),var(--border-color)) bottom left,
-			linear-gradient(var(--border-color),var(--border-color)) bottom left,
-			linear-gradient(var(--border-color),var(--border-color)) top right,
-			linear-gradient(var(--border-color),var(--border-color)) top right,
-			linear-gradient(var(--border-color),var(--border-color)) bottom right,
-			linear-gradient(var(--border-color),var(--border-color)) bottom right;
-		background-size:var(--border-thickness) var(--border-width),var(--border-width) var(--border-thickness);
-		background-origin:border-box;
-		background-repeat:no-repeat;
+		outline: -webkit-focus-ring-color auto 1px;
+	}
+
+	:host([disabled]) {
+		opacity: 0.5;
+		pointer-events: none;
+	}
+
+	:host(:has(input:focus)) {
+		outline: none;
 	}
 
     label,
-    #knob,
     input {
-		justify-self: var(--knob-text-justify);
+		justify-self: center;
 	}
 
 	#knob {
 		--knob-rotation: calc(300deg * var(--knob-normal) - 150deg);
-		display: flex;
-		justify-content: center;
 		grid-area: knob;
-		width: 100%;
-		min-width: calc(4ch + var(--knob-grid-gap));
-		aspect-ratio: 1/1;
+		display: flex;
 		
 		/*prevent click and drag inner content*/
 		touch-action: none;
@@ -303,96 +305,30 @@
 		outline: none;
 	}
 
-	label,
-	input {
-		text-align: var(--knob-text-align);
-		padding: 0;
+	::slotted(*:first-of-type) {
+		width: 100%;
 	}
 
-	label {
-		font-size: var(--knob-label-font-size);
-		font-weight: 700;
-		grid-area: label;
+	label,
+	input {
+		text-align: center;
+		width: 100%;
+	}
+
+	label {		
 		-webkit-user-select: none;  /* Safari all */
   		user-select: none;
 	}
 
     input {
-        font-size: var(--knob-input-font-size);
+		font-variant-numeric: tabular-nums;
 		grid-area: input;
-		white-space: nowrap;
 		background: transparent;
 		border: none;
-		max-width: var(--char-max);
     }
 
 	input:focus {
+		color: initial;
 		background: white;
 	}
-
-	/*Default Knob Styles */
-	g {
-		transform-origin: center center;
-		transform: rotateZ(var(--knob-rotation));
-	}
-	svg {
-		display: block;
-	}
-
-	circle {
-		fill: var(--knob-fill);
-	}
-
-	rect {
-		fill: var(--indicator-fill);
-        width: var(--indicator-width);
-        height:var(--indicator-height);
-        x: calc(50% - var(--indicator-width) / 2);
-	}
-
-    :host(.text-left),
-    :host(.text-right) {
-        grid-template-rows: 1fr 1fr;
-    }
-
-    :host(.text-left) {
-		--knob-text-align: left;
-		--knob-text-justify: start;
-		grid-template-columns: min-content auto;
-        grid-template-areas:
-        'label knob'
-        'input knob';
-    }
-
-    :host(.text-right) {
-		--knob-text-align: right;
-		--knob-text-justify: end;
-		grid-template-columns: auto min-content;
-        grid-template-areas:
-        'knob label'
-        'knob input';
-    }
-
-    :host(.text-top) {
-		grid-template-rows: min-content min-content auto;
-        grid-template-areas:
-        'label'
-        'input'
-        'knob';
-    }
-
-    :host(.text-bottom) {
-		grid-template-rows: auto min-content min-content;
-        grid-template-areas:
-        'knob'
-        'label'
-        'input';
-    }
-
-    :host(.text-reverse) {
-        grid-template-areas:
-        'input'
-        'knob'
-        'label';
-    }
 </style>
