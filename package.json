@@ -1,6 +1,6 @@
 {
-  "name": "svelte-web-components-template",
-  "description": "A base template for building a shareable web components library with Svelte",
+  "name": "dumptruck-components",
+  "description": "A library of Web Components for audio apps.",
   "version": "0.0.1",
   "module": "dist/index.mjs",
   "main": "dist/index.js",
@@ -17,8 +17,8 @@
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^19.0.2",
-    "@rollup/plugin-node-resolve": "^13.1.3",
+    "@rollup/plugin-commonjs": "^20.0.0",
+    "@rollup/plugin-node-resolve": "^13.0.4",
     "rollup": "^2.0.0",
     "rollup-plugin-clean": "^1.0.0",
     "rollup-plugin-css-only": "^3.1.0",
@@ -27,8 +27,8 @@
     "rollup-plugin-summary": "^1.3.0",
     "rollup-plugin-svelte": "^7.0.0",
     "rollup-plugin-terser": "^7.0.0",
-    "sirv-cli": "^1.0.14",
-    "svelte": "^3.46.4"
+    "sirv-cli": "^1.0.0",
+    "svelte": "^3.0.0"
   },
   "files": [
     "dist"
