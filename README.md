@@ -1,24 +1,30 @@
-# svelte-web-components-template
+# dumptruck-components
 
 > A base template for building a shareable web components library with [Svelte](https://svelte.dev).
 
-## How to use this template
+## Components
+
+## Quick Start
+
+## Development
+
+This web component library is built from [svelte-web-components-template](https://github.com/sinedied/svelte-web-components-template)
 
 You can directly create a new GitHub repo from this template by selecting the **Use this template** button on GitHub.
 
-You can also clone it locally with the following commands:
+To install and work on Dumptruck Components locally:
 
 ```bash
-npx degit sinedied/svelte-web-components-template#main my-component-lib
-cd my-component-lib
-npm install # or yarn
+git clone https://github.com/michaelbauchert/dumptruck-components.git
+cd dumptruck-components
+npm install
 ```
 
-Your components source code lives in `lib/` folder. Only components with the `.wc.svelte` extension will be exported as web components and available in your library. This means that you can also use regular Svelte components with the `.svelte` extension as child components for your implementation details.
+The components' source code lives in `lib/` folder. Only components with the `.wc.svelte` extension will be exported as web components and available the library. This means that you can also use regular Svelte components with the `.svelte` extension as child components for your implementation details.
 
 You can add additional components by adding them to the `lib` folder and editing `lib/index.js`.
 
-## Testing your components
+## Testing Components
 
 You can start a development server with:
 
@@ -28,31 +34,29 @@ npm run dev
 
 Then open your browser to [localhost:5000](http://localhost:5000).
 
-This will build the demo application located in the `demo/` folder, in which you can use and test your components during development.
+This will build the demo application located in the `demo/` folder, in which you can use and test your components during development. 
 
-If you want to add unit tests, you can take a look at [Jest](https://jestjs.io) and [Jest testing library](https://github.com/testing-library/svelte-testing-library). 
+### Using the Built Web Components with the Demo App
 
-### Using the built web components with the demo app
-
-The demo application is provided for development and testing of your components, that's why it imports the `.svelte` files from the `lib/` folder directly by default.
+The demo application is provided for development and testing of the components, that's why it imports the `.svelte` files from the `lib/` folder directly by default.
 
 If you prefer, you can import the built web components from the `dist/` folder instead, by editing `demo/src/App.svelte` and replacing the `import '../../lib';` statement with `import '../../dist';` if you have the `bundleComponents` option enabled, or individually import your components with `import import '../../dist/MyComponent.wc.js';` otherwise.
 
 You'll also have to make sure to run the `npm run build` script to generate the `dist/` folder first.
 
-## Building the library
+## Building the Library
 
 The command `npm run build` will create the web components library in the `dist/` folder. It creates both a JavaScript module (`dist/index.mjs`) and a regular UMD script (`dist/index.js`).
 
 The build is automatically called when executing `npm publish` or `npm pack` to distribute your library, thanks to the `prepublishOnly` scripts in `package.json`.
 
-## Notes and limitations
+## Dev Limitations
 
-This template does not provide any web components polyfills for older browsers support. It's usually best to leave that task to the host application, hence why they're left out.
+Dumptruck Components does not provide any web components polyfills for older browsers support. It's usually best to leave that task to the host application, hence why they're left out.
 
 ### Props
 
-Any props accepted by your web component are automatically transformed to element attributes. Since camelCase or PascalCase does not work in HTML, you have to make sure to name your props in lowercase.
+Any props accepted by each web component are automatically transformed to element attributes. Since camelCase or PascalCase does not work in HTML, you have to make sure to name your props in lowercase.
 
 ```html
 <script>
@@ -88,22 +92,3 @@ Here's an example:
   Click to dispatch event
 </button>
 ```
-
-## Building each component into its own module
-
-By default this template will build all components into a single module.
-
-If you prefer to build each component into its own module, you can do so by editing `rollup.config.js` and setting the `bundleComponents` option to `false`.
-
-Then you also need to replace the content of `lib/index.js` with:
-
-```js
-export default () => {
-  import('./MyComponent.wc.svelte');
-  // Import each of your component this way
-};
-```
-
-This will enable code-splitting and will generate an ES module for each component in the `dist/` folder.
-
-As you changed the way components are exported, you also need to replace the `import '../../lib';` statement in `demo/src/App.svelte` to `import import '../../lib/MyComponent.wc.svelte';`.
